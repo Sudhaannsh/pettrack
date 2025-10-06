@@ -1,0 +1,637 @@
+import 'package:flutter/material.dart';
+import 'package:pettrack/models/pet_model.dart';
+import 'package:pettrack/services/pet_service.dart';
+import 'package:pettrack/services/auth_service.dart';
+import 'package:pettrack/screens/pet_qr_screen.dart';
+import 'package:pettrack/screens/post_pet_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
+class MyPetsScreen extends StatefulWidget {
+  const MyPetsScreen({Key? key}) : super(key: key);
+
+  @override
+  _MyPetsScreenState createState() => _MyPetsScreenState();
+}
+
+class _MyPetsScreenState extends State<MyPetsScreen> {
+  final PetService _petService = PetService();
+  final AuthService _authService = AuthService();
+  Stream<List<Pet>>? _petsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupPetsStream();
+  }
+
+  void _setupPetsStream() {
+    final userId = _authService.currentUser?.uid;
+    if (userId != null) {
+      _petsStream = _petService.getPetsByUserId(userId);
+      setState(() {});
+    }
+  }
+
+  Future<void> _addPet() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => const PostPetScreen(isLostPet: false),
+      ),
+    );
+
+    if (result == true) {
+      _setupPetsStream();
+    }
+  }
+
+  Future<void> _editPet(Pet pet) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => PostPetScreen(
+          isLostPet: pet.status == 'lost',
+          petToEdit: pet,
+        ),
+      ),
+    );
+
+    if (result == true) {
+      _setupPetsStream();
+    }
+  }
+
+  void _generateQRCode(Pet pet) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PetQRScreen(pet: pet),
+      ),
+    );
+  }
+
+  Future<void> _deletePet(Pet pet) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Pet'),
+        content: const Text('Are you sure you want to delete this pet?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      try {
+        await _petService.deletePet(pet.id, pet.imageUrl);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pet deleted successfully')),
+          );
+          _setupPetsStream();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting pet: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Widget _buildPetCard(Pet pet) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: ListTile(
+        leading: pet.imageUrl != null && pet.imageUrl.isNotEmpty
+            ? CircleAvatar(
+                backgroundImage: CachedNetworkImageProvider(pet.imageUrl),
+              )
+            : const CircleAvatar(
+                child: Icon(Icons.pets),
+              ),
+        title: Text(pet.name),
+        subtitle: Text('Status: ${pet.status}'),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            switch (value) {
+              case 'edit':
+                _editPet(pet);
+                break;
+              case 'qr':
+                _generateQRCode(pet);
+                break;
+              case 'delete':
+                _deletePet(pet);
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'edit',
+              child: Text('Edit'),
+            ),
+            const PopupMenuItem(
+              value: 'qr',
+              child: Text('QR Code'),
+            ),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Text('Delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Pets'),
+      ),
+      body: StreamBuilder<List<Pet>>(
+        stream: _petsStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Error: ${snapshot.error}'),
+            );
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          final pets = snapshot.data ?? [];
+
+          if (pets.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('No pets added yet'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _addPet,
+                    child: const Text('Add Pet'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              _setupPetsStream();
+            },
+            child: ListView.builder(
+              itemCount: pets.length,
+              itemBuilder: (context, index) => _buildPetCard(pets[index]),
+            ),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addPet,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+class MyPetsScreen extends StatefulWidget {
+  const MyPetsScreen({Key? key}) : super(key: key);
+
+  @override
+  State<MyPetsScreen> createState() => _MyPetsScreenState();
+}
+
+class _MyPetsScreenState extends State<MyPetsScreen> {
+  final PetService _petService = PetService();
+  final AuthService _authService = AuthService();
+  Stream<List<Pet>>? _petsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupPetsStream();
+  }
+
+  void _setupPetsStream() {
+    final userId = _authService.currentUser?.uid;
+    if (userId != null) {
+      setState(() {
+        _petsStream = _petService.getPetsByUserId(userId);
+      });
+    }
+  }
+
+  void _addPet() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const PostPetScreen(isLostPet: false),
+      ),
+    );
+
+    if (result == true) {
+      _setupPetsStream();
+    }
+  }
+
+  void _editPet(Pet pet) async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PostPetScreen(
+          isLostPet: pet.status == 'lost',
+          petToEdit: pet,
+        ),
+      ),
+    );
+
+    if (result == true) {
+      _setupPetsStream();
+    }
+  }
+
+  void _generateQRCode(Pet pet) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PetQRScreen(pet: pet),
+      ),
+    );
+  }
+
+  void _deletePet(Pet pet) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Pet'),
+        content: const Text('Are you sure you want to delete this pet?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      try {
+        await _petService.deletePet(pet.id, pet.imageUrl);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pet deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting pet: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Widget _buildPetCard(Pet pet) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: ListTile(
+        leading: pet.imageUrl != null && pet.imageUrl.isNotEmpty
+            ? CircleAvatar(
+                backgroundImage: CachedNetworkImageProvider(pet.imageUrl),
+              )
+            : const CircleAvatar(
+                child: Icon(Icons.pets),
+              ),
+        title: Text(pet.name),
+        subtitle: Text('Status: ${pet.status}'),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            switch (value) {
+              case 'edit':
+                _editPet(pet);
+                break;
+              case 'qr':
+                _generateQRCode(pet);
+                break;
+              case 'delete':
+                _deletePet(pet);
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'edit',
+              child: Text('Edit'),
+            ),
+            const PopupMenuItem(
+              value: 'qr',
+              child: Text('QR Code'),
+            ),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Text('Delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Pets'),
+      ),
+      body: StreamBuilder<List<Pet>>(
+        stream: _petsStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Error: ${snapshot.error}'),
+            );
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          final pets = snapshot.data ?? [];
+
+          if (pets.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('No pets added yet'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _addPet,
+                    child: const Text('Add Pet'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              _setupPetsStream();
+            },
+            child: ListView.builder(
+              itemCount: pets.length,
+              itemBuilder: (context, index) => _buildPetCard(pets[index]),
+            ),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addPet,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+}
+}
+
+class MyPetsScreen extends StatefulWidget {
+  const MyPetsScreen({super.key});
+
+  @override
+  State<MyPetsScreen> createState() => _MyPetsScreenState();
+}
+
+class _MyPetsScreenState extends State<MyPetsScreen> {
+  final PetService _petService = PetService();
+  final AuthService _authService = AuthService();
+  List<Pet> _pets = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPets();
+  }
+
+  Future<void> _loadPets() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userId = _authService.currentUser?.uid;
+      if (userId != null) {
+        _petService.getPetsByUserId(userId).listen(
+          (pets) {
+            if (mounted) {
+              setState(() {
+                _pets = pets;
+                _isLoading = false;
+              });
+            }
+          },
+          onError: (error) {
+            print('Error loading pets: $error');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error loading pets: $error')),
+              );
+              setState(() {
+                _isLoading = false;
+              });
+            }
+          }
+        );
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading pets: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading pets: $e')),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      });
+    }
+  }
+
+  void _navigateToAddPet() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PostPetScreen(
+          isLostPet: false, // Adding as owned pet
+        ),
+      ),
+    );
+    if (result == true && mounted) {
+      _loadPets();
+    }
+  }
+
+  void _editPet(Pet pet) async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PostPetScreen(
+          isLostPet: false,
+          petToEdit: pet,
+        ),
+      ),
+    );
+    if (result == true && mounted) {
+      _loadPets();
+    }
+  }
+
+  void _generateQRCode(Pet pet) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PetQRScreen(pet: pet),
+      ),
+    );
+  }
+
+  void _deletePet(Pet pet) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Pet'),
+        content: const Text('Are you sure you want to delete this pet?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      try {
+        await _petService.deletePet(pet.id);
+        _loadPets();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pet deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting pet: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Pets'),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _navigateToAddPet,
+        child: const Icon(Icons.add),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _pets.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.pets,
+                        size: 64,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No pets added yet',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: _navigateToAddPet,
+                        child: const Text('Add a Pet'),
+                      ),
+              
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadPets,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: _pets.length,
+                    itemBuilder: (context, index) {
+                      final pet = _pets[index];
+                      return Card(
+                        elevation: 2,
+                        margin: const EdgeInsets.symmetric(
+                          vertical: 8,
+                          horizontal: 4,
+                        ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage: pet.imageUrl.isNotEmpty
+                                ? CachedNetworkImageProvider(pet.imageUrl)
+                                : null,
+                            child: pet.imageUrl.isEmpty
+                                ? const Icon(Icons.pets)
+                                : null,
+                          ),
+                          title: Text(pet.name),
+                          subtitle: Text(pet.breed),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.qr_code),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => PetQRScreen(pet: pet),
+                                ),
+                              );
+                            },
+                            tooltip: 'Generate QR Code',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+    );
+  }
+}

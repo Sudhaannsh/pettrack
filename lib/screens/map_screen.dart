@@ -120,8 +120,6 @@ class _MapScreenState extends State<MapScreen> {
     double radiusKm,
   ) {
     return pets.where((pet) {
-      if (pet.longitude == null || pet.latitude == 0.0 || pet.longitude == 0.0)
-        return false;
       final distance = Geolocator.distanceBetween(
         latitude,
         longitude,
@@ -142,7 +140,7 @@ class _MapScreenState extends State<MapScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => PetDetailScreen(petId: pet.id!),
+                builder: (context) => PetDetailScreen(petId: pet.id),
               ),
             );
           },
@@ -151,7 +149,9 @@ class _MapScreenState extends State<MapScreen> {
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: pet.status == 'lost' ? Colors.red : Colors.green,
+                  color: pet.status == 'lost'
+                      ? Colors.red.withOpacity(0.8)
+                      : Colors.green.withOpacity(0.8),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -244,17 +244,14 @@ class _MapScreenState extends State<MapScreen> {
                 // Current location marker
                 if (_locationLoaded)
                   Marker(
-                    width: 40.0,
-                    height: 40.0,
+                    width: 20,
+                    height: 20,
                     point: _currentPosition,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.3),
+                        color: Colors.blue.withOpacity(0.8),
                         shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.my_location,
-                        color: Colors.blue,
+                        border: Border.all(color: Colors.white, width: 2),
                       ),
                     ),
                   ),
@@ -266,10 +263,11 @@ class _MapScreenState extends State<MapScreen> {
                 circles: [
                   CircleMarker(
                     point: _currentPosition,
-                    color: Colors.blue.withOpacity(0.2),
-                    borderColor: Colors.blue.withOpacity(0.7),
-                    borderStrokeWidth: 2,
                     radius: _searchRadius * 1000, // Convert km to meters
+                    useRadiusInMeter: true,
+                    color: Colors.blue.withOpacity(0.1),
+                    borderColor: Colors.blue.withOpacity(0.5),
+                    borderStrokeWidth: 2,
                   ),
                 ],
               ),
@@ -285,46 +283,25 @@ class _MapScreenState extends State<MapScreen> {
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Text(
-                      'Search Radius: ${_searchRadius.toStringAsFixed(1)} km',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Search Radius: ${_searchRadius.toStringAsFixed(1)} km',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                    ),
+                      Text('${_markers.length} pets found'),
+                    ],
                   ),
                   Slider(
                     value: _searchRadius,
                     min: 1.0,
                     max: 50.0,
                     divisions: 49,
-                    label: '${_searchRadius.toStringAsFixed(1)} km',
-                    onChanged: (value) {
-                      _updateSearchRadius(value);
-                    },
+                    onChanged: _updateSearchRadius,
                   ),
                 ],
-              ),
-            ),
-          ),
-        ),
-
-        // Pet count
-        Positioned(
-          bottom: 16,
-          left: 16,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(
-                'Showing ${_markers.length} pets',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
               ),
             ),
           ),

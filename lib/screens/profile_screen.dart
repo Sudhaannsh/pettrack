@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pettrack/services/auth_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pettrack/models/user_model.dart';
+import 'package:pettrack/screens/my_pets_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,7 +12,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Removed unused Firestore instance
   UserModel? _user;
   bool _isLoading = true;
 
@@ -23,20 +23,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserData() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final userId = _authService.currentUser?.uid;
-      if (userId != null) {
-        final doc = await _firestore.collection('users').doc(userId).get();
-        if (doc.exists) {
-          setState(() {
-            _user = UserModel.fromMap(doc.data() as Map<String, dynamic>);
-          });
+      final userData = await _authService.getUserData();
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _user = userData;
+        if (userData == null) {
+          print('No user data found in Firestore');
         }
-      }
+      });
     } catch (e) {
       print('Error loading user data: $e');
     } finally {
@@ -98,7 +101,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 30),
           _buildInfoCard('My Pets', 'View and manage your pets', Icons.pets,
               () {
-            // Navigate to My Pets screen
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const MyPetsScreen()),
+            );
           }),
           _buildInfoCard('Settings', 'App preferences and account settings',
               Icons.settings, () {

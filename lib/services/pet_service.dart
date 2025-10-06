@@ -9,6 +9,23 @@ class PetService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final CloudinaryService _cloudinaryService = CloudinaryService();
 
+  // Get pets by user ID
+  Future<List<PetModel>> getPetsByUserId(String userId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('pets')
+          .where('userId', isEqualTo: userId)
+          .get();
+      
+      return snapshot.docs
+          .map((doc) => PetModel.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error getting pets by user ID: $e');
+      return [];
+    }
+  }
+
   // Add a new pet
   Future<void> addPet(PetModel pet, File imageFile) async {
     try {

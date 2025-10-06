@@ -62,6 +62,7 @@ class _PostPetScreenState extends State<PostPetScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
+    if (!mounted) return;
     setState(() {
       _isLocationLoading = true;
       _locationText = 'Fetching location...';
@@ -72,6 +73,7 @@ class _PostPetScreenState extends State<PostPetScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
+          if (!mounted) return;
           setState(() {
             _locationText = 'Location permissions are denied';
             _isLocationLoading = false;
@@ -81,6 +83,7 @@ class _PostPetScreenState extends State<PostPetScreen> {
       }
 
       if (permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
         setState(() {
           _locationText = 'Location permissions are permanently denied';
           _isLocationLoading = false;
@@ -93,6 +96,7 @@ class _PostPetScreenState extends State<PostPetScreen> {
         timeLimit: const Duration(seconds: 10),
       );
 
+      if (!mounted) return;
       setState(() {
         _latitude = position.latitude;
         _longitude = position.longitude;
@@ -106,23 +110,27 @@ class _PostPetScreenState extends State<PostPetScreen> {
 
         if (placemarks.isNotEmpty) {
           Placemark place = placemarks[0];
+          if (!mounted) return;
           setState(() {
             _locationText = '${place.street ?? ''}, ${place.locality ?? ''}, ${place.country ?? ''}';
             _isLocationLoading = false;
           });
         } else {
+          if (!mounted) return;
           setState(() {
             _locationText = 'Lat: ${_latitude.toStringAsFixed(6)}, Lng: ${_longitude.toStringAsFixed(6)}';
             _isLocationLoading = false;
           });
         }
       } catch (e) {
+        if (!mounted) return;
         setState(() {
           _locationText = 'Lat: ${_latitude.toStringAsFixed(6)}, Lng: ${_longitude.toStringAsFixed(6)}';
           _isLocationLoading = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _locationText = 'Error getting location: $e';
         _isLocationLoading = false;

@@ -9,7 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class PetDetailScreen extends StatefulWidget {
-  final String petId;
+  final String? petId;
 
   const PetDetailScreen({super.key, required this.petId});
 
@@ -38,7 +38,10 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     });
 
     try {
-      final pet = await _petService.getPetById(widget.petId);
+      if (widget.petId == null) {
+        throw Exception("Pet ID is null");
+      }
+      final pet = await _petService.getPetById(widget.petId!);
       setState(() {
         _pet = pet;
       });
