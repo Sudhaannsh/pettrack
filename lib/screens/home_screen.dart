@@ -4,11 +4,13 @@ import 'package:pettrack/screens/post_pet_screen.dart';
 import 'package:pettrack/screens/profile_screen.dart';
 import 'package:pettrack/screens/pet_detail_screen.dart';
 import 'package:pettrack/screens/qr_scanner_screen.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:pettrack/services/auth_service.dart';
 import 'package:pettrack/services/pet_service.dart';
 import 'package:pettrack/models/pet_model.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+// import 'package:pettrack/screens/image_search_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 
@@ -74,6 +76,17 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('PetTrack'),
         actions: [
+          // IconButton(
+          //   icon: const Icon(Icons.image_search),
+          //   onPressed: () {
+          //     Navigator.of(context).push(
+          //       MaterialPageRoute(
+          //         builder: (context) => const ImageSearchScreen(),  
+          //       ),
+          //     );
+          //   },
+          //   tooltip: 'Search by Image',
+          // ),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
@@ -334,7 +347,7 @@ class PetCard extends StatelessWidget {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => PetDetailScreen(petId: pet.id),
+              builder: (context) => PetDetailScreen(petId: pet.id!),
             ),
           );
         },
@@ -399,6 +412,7 @@ class PetCard extends StatelessWidget {
 }
 
 // Map Tab - Shows pets on map
+// Map Tab - Shows pets on map with current location
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
 
@@ -408,12 +422,60 @@ class MapTab extends StatefulWidget {
 
 class _MapTabState extends State<MapTab> {
   final PetService _petService = PetService();
+  final MapController _mapController = MapController();
   List<Marker> _markers = [];
+  LatLng? _currentPosition;
+  bool _isLoading = true;
+  bool _locationLoaded = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    _loadPetMarkers();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _errorMessage = 'Location permissions are denied';
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _errorMessage = 'Location permissions are permanently denied';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      setState(() {
+        _currentPosition = LatLng(position.latitude, position.longitude);
+        _locationLoaded = true;
+      });
+
+      _loadPetMarkers();
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error getting location: $e';
+        _isLoading = false;
+      });
+      // Still load pets even if location fails
+      _loadPetMarkers();
+    }
   }
 
   Future<void> _loadPetMarkers() async {
@@ -424,52 +486,192 @@ class _MapTabState extends State<MapTab> {
             .where((pet) => pet.latitude != 0 && pet.longitude != 0)
             .map((pet) {
           return Marker(
-            width: 40,
-            height: 40,
+            width: 80,
+            height: 80,
             point: LatLng(pet.latitude, pet.longitude),
             child: GestureDetector(
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => PetDetailScreen(petId: pet.id),
+                    builder: (context) => PetDetailScreen(petId: pet.id!),
                   ),
                 );
               },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: pet.status == 'lost'
-                      ? Colors.red.withOpacity(0.8)
-                      : Colors.green.withOpacity(0.8),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.pets,
-                  color: Colors.white,
-                  size: 24,
-                ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: pet.status == 'lost'
+                          ? Colors.red.withOpacity(0.8)
+                          : Colors.green.withOpacity(0.8),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.pets,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  Text(
+                    pet.name,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                ],
               ),
             ),
           );
         }).toList();
+        _isLoading = false;
       });
     } catch (e) {
       print('Error loading pet markers: $e');
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FlutterMap(
-      options: const MapOptions(
-        initialCenter: LatLng(37.42796133580664, -122.085749655962),
-        initialZoom: 12.0,
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.pettrack',
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading map...'),
+          ],
         ),
-        MarkerLayer(markers: _markers),
+      );
+    }
+
+    if (_errorMessage.isNotEmpty && _currentPosition == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: Colors.red,
+                size: 60,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isLoading = true;
+                    _errorMessage = '';
+                  });
+                  _getCurrentLocation();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Use current location if available, otherwise use default
+    final initialCenter =
+        _currentPosition ?? const LatLng(37.42796133580664, -122.085749655962);
+
+    return Stack(
+      children: [
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: initialCenter,
+            initialZoom: _locationLoaded ? 13.0 : 4.0,
+            minZoom: 5.0,
+            maxZoom: 18.0,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.pettrack',
+            ),
+            MarkerLayer(
+              markers: [
+                // Current location marker
+                if (_locationLoaded && _currentPosition != null)
+                  Marker(
+                    width: 60,
+                    height: 60,
+                    point: _currentPosition!,
+                    child: GestureDetector(
+                      onTap: () {
+                        _mapController.move(_currentPosition!, 15.0);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.8),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.my_location,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ..._markers,
+              ],
+            ),
+          ],
+        ),
+        // Center on location button
+        if (_locationLoaded && _currentPosition != null)
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: FloatingActionButton(
+              backgroundColor: Colors.blue,
+              onPressed: () {
+                _mapController.move(_currentPosition!, 13.0);
+              },
+              child: const Icon(Icons.my_location, color: Colors.white),
+            ),
+          ),
+        // Pet count indicator
+        Positioned(
+          top: 16,
+          left: 16,
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                '${_markers.length} pets nearby',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -3,7 +3,7 @@ import 'package:pettrack/models/pet_model.dart';
 import 'package:pettrack/services/pet_service.dart';
 import 'package:pettrack/services/auth_service.dart';
 import 'package:pettrack/screens/pet_qr_screen.dart';
-import 'package:pettrack/screens/post_pet_screen.dart';
+import 'package:pettrack/screens/add_edit_pet_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class MyPetsScreen extends StatefulWidget {
@@ -32,11 +32,17 @@ class _MyPetsScreenState extends State<MyPetsScreen> {
 
     try {
       final userId = _authService.currentUser?.uid;
+      print('Current user ID: $userId'); // Debug log
+
       if (userId != null) {
         final pets = await _petService.getPetsByUserId(userId);
+        print('Loaded ${pets.length} pets'); // Debug log
+
         setState(() {
           _pets = pets;
         });
+      } else {
+        print('No user logged in'); // Debug log
       }
     } catch (e) {
       print('Error loading pets: $e');
@@ -55,7 +61,7 @@ class _MyPetsScreenState extends State<MyPetsScreen> {
   void _navigateToAddPet() async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const PostPetScreen(),
+        builder: (context) => const AddEditPetScreen(),
       ),
     );
     if (result == true && mounted) {
@@ -63,11 +69,109 @@ class _MyPetsScreenState extends State<MyPetsScreen> {
     }
   }
 
+  void _navigateToEditPet(PetModel pet) async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AddEditPetScreen(pet: pet),
+      ),
+    );
+    if (result == true && mounted) {
+      _loadPets();
+    }
+  }
+
+  Future<void> _deletePet(PetModel pet) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Pet'),
+        content: Text('Are you sure you want to delete ${pet.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _petService.deletePet(pet.id!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${pet.name} deleted successfully')),
+          );
+          _loadPets();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting pet: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  void _showPetOptions(PetModel pet) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.qr_code),
+              title: const Text('View QR Code'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => PetQRScreen(pet: pet),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Edit'),
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToEditPet(pet);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                _deletePet(pet);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Pets'),
+        actions: [
+          // Add refresh button for debugging
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadPets,
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToAddPet,
@@ -96,7 +200,16 @@ class _MyPetsScreenState extends State<MyPetsScreen> {
                       const SizedBox(height: 8),
                       ElevatedButton(
                         onPressed: _navigateToAddPet,
-                        child: const Text('Add a Pet'),
+                        child: const Text('Add Your First Pet'),
+                      ),
+                      const SizedBox(height: 16),
+                      // Debug info
+                      Text(
+                        'User ID: ${_authService.currentUser?.uid ?? 'Not logged in'}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
                       ),
                     ],
                   ),
@@ -115,27 +228,54 @@ class _MyPetsScreenState extends State<MyPetsScreen> {
                           horizontal: 4,
                         ),
                         child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage: pet.imageUrl.isNotEmpty
-                                ? CachedNetworkImageProvider(pet.imageUrl)
-                                : null,
-                            child: pet.imageUrl.isEmpty
-                                ? const Icon(Icons.pets)
-                                : null,
+                          leading: Hero(
+                            tag: 'pet_${pet.id}',
+                            child: CircleAvatar(
+                              radius: 30,
+                              backgroundImage: pet.imageUrl.isNotEmpty
+                                  ? CachedNetworkImageProvider(pet.imageUrl)
+                                  : null,
+                              child: pet.imageUrl.isEmpty
+                                  ? const Icon(Icons.pets, size: 30)
+                                  : null,
+                            ),
                           ),
-                          title: Text(pet.name),
-                          subtitle: Text(pet.breed),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.qr_code),
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => PetQRScreen(pet: pet),
+                          title: Text(
+                            pet.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(pet.breed),
+                              // Fixed: Check if age exists and is not empty
+                              if (pet.age.isNotEmpty)
+                                Text(
+                                  pet.age,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
                                 ),
-                              );
-                            },
-                            tooltip: 'Generate QR Code',
+                              // Show status for debugging
+                              Text(
+                                'Status: ${pet.status}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade400,
+                                ),
+                              ),
+                            ],
                           ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.more_vert),
+                            onPressed: () => _showPetOptions(pet),
+                          ),
+                          onTap: () => _showPetOptions(pet),
                         ),
                       );
                     },
