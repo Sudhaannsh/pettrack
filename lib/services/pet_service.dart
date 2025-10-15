@@ -288,10 +288,494 @@
 //     return degrees * (pi / 180);
 //   }
 // }
+
+// import 'dart:io';
+// import 'dart:math';
+// import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:firebase_storage/firebase_storage.dart'; // Add this import
+// import 'package:pettrack/models/pet_model.dart';
+// import 'package:pettrack/services/cloudinary_service.dart';
+
+// class PetService {
+//   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+//   final CloudinaryService _cloudinaryService = CloudinaryService();
+
+//   // ADD THIS: Upload image method (can use Cloudinary or Firebase Storage)
+//   // Upload image method
+//   Future<String> uploadImage(File imageFile) async {
+//     try {
+//       return await _cloudinaryService.uploadImage(imageFile);
+//     } catch (e) {
+//       throw Exception('Failed to upload image: $e');
+//     }
+//   }
+
+
+
+//   // UPDATE THIS: Modified addPet method to accept Map instead of PetModel + File
+//   Future<String> addPet(Map<String, dynamic> petData) async {
+//     try {
+//       // Add to Firestore
+//       final docRef = await _firestore.collection('pets').add(petData);
+//       return docRef.id;
+//     } catch (e) {
+//       print('Error in addPet: $e');
+//       throw Exception('Failed to add pet: $e');
+//     }
+//   }
+
+//   // UPDATE THIS: Modified updatePet to accept petId and Map
+//   Future<void> updatePet(String petId, Map<String, dynamic> petData) async {
+//     try {
+//       // Update in Firestore
+//       await _firestore.collection('pets').doc(petId).update(petData);
+//     } catch (e) {
+//       print('Error updating pet: $e');
+//       throw Exception('Failed to update pet: $e');
+//     }
+//   }
+
+//   // UPDATE THIS: Simplified deletePet method
+//   Future<void> deletePet(String petId) async {
+//     try {
+//       // Get pet data to extract image URL
+//       final petDoc = await _firestore.collection('pets').doc(petId).get();
+
+//       if (petDoc.exists) {
+//         final petData = petDoc.data();
+//         final imageUrl = petData?['imageUrl'] as String?;
+
+//         // Delete from Firestore
+//         await _firestore.collection('pets').doc(petId).delete();
+
+//         // Optional: Delete image from storage
+//         if (imageUrl != null && imageUrl.isNotEmpty) {
+//           try {
+//             // If using Cloudinary
+//             String publicId =
+//                 _cloudinaryService.extractPublicIdFromUrl(imageUrl);
+//             print('Pet deleted. Image public ID for manual cleanup: $publicId');
+
+//             // If using Firebase Storage, uncomment below:
+//             /*
+//             final ref = FirebaseStorage.instance.refFromURL(imageUrl);
+//             await ref.delete();
+//             */
+//           } catch (e) {
+//             print('Error deleting image: $e');
+//           }
+//         }
+//       }
+//     } catch (e) {
+//       print('Error deleting pet: $e');
+//       throw Exception('Failed to delete pet: $e');
+//     }
+//   }
+
+//   // UPDATE THIS: Get pets by user ID with 'owned' status filter
+//   // Future<List<PetModel>> getPetsByUserId(String userId) async {
+//   //   try {
+//   //     final snapshot = await _firestore
+//   //         .collection('pets')
+//   //         .where('ownerId',
+//   //             isEqualTo: userId) // Changed from 'userId' to 'ownerId'
+//   //         .where('status', isEqualTo: 'owned')
+//   //         .orderBy('timestamp', descending: true)
+//   //         .get();
+
+//   //     return snapshot.docs
+//   //         .map((doc) => PetModel.fromFirestore(
+//   //             doc)) // Use fromFirestore instead of fromMap
+//   //         .toList();
+//   //   } catch (e) {
+//   //     print('Error getting pets by user ID: $e');
+//   //     return [];
+//   //   }
+//   // }
+// // Update this method in pet_service.dart
+//   Future<List<PetModel>> getPetsByUserId(String userId) async {
+//     try {
+//       print('Getting pets for user: $userId'); // Debug log
+
+//       // Try both field names for compatibility
+//       final snapshot1 = await _firestore
+//           .collection('pets')
+//           .where('ownerId', isEqualTo: userId)
+//           .get();
+
+//       final snapshot2 = await _firestore
+//           .collection('pets')
+//           .where('userId', isEqualTo: userId)
+//           .get();
+
+//       // Combine results and remove duplicates
+//       Set<String> seenIds = {};
+//       List<PetModel> allPets = [];
+
+//       for (var doc in [...snapshot1.docs, ...snapshot2.docs]) {
+//         if (!seenIds.contains(doc.id)) {
+//           seenIds.add(doc.id);
+//           allPets.add(PetModel.fromFirestore(doc));
+//         }
+//       }
+
+//       print('Found ${allPets.length} pets'); // Debug log
+
+//       // Sort by timestamp
+//       allPets.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+//       return allPets;
+//     } catch (e) {
+//       print('Error getting pets by user ID: $e');
+//       return [];
+//     }
+//   }
+//   // KEEP THIS: Get pets by status (lost/found)
+//   Stream<List<PetModel>> getPetsByStatus(String status) {
+//     return _firestore
+//         .collection('pets')
+//         .where('status', isEqualTo: status)
+//         .snapshots()
+//         .map((snapshot) {
+//       List<PetModel> pets =
+//           snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
+
+//       pets.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+//       return pets;
+//     });
+//   }
+
+//   // UPDATE THIS: Get a single pet by ID (already good, just ensure it uses fromFirestore)
+//   Future<PetModel?> getPetById(String petId) async {
+//     try {
+//       DocumentSnapshot doc =
+//           await _firestore.collection('pets').doc(petId).get();
+//       if (doc.exists) {
+//         return PetModel.fromFirestore(doc);
+//       }
+//       return null;
+//     } catch (e) {
+//       print('Error getting pet by ID: $e');
+//       return null; // Return null instead of rethrowing for better UX
+//     }
+//   }
+
+//   // UPDATE THIS: Get pets by user ID as Stream
+//   Stream<List<PetModel>> getUserPets(String userId) {
+//     return _firestore
+//         .collection('pets')
+//         .where('ownerId', isEqualTo: userId) // Changed from 'userId'
+//         .where('status', isEqualTo: 'owned')
+//         .orderBy('timestamp', descending: true)
+//         .snapshots()
+//         .map((snapshot) {
+//       return snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
+//     });
+//   }
+
+//   // KEEP THIS: Get all pets (stream)
+//   Stream<List<PetModel>> getAllPets() {
+//     return _firestore
+//         .collection('pets')
+//         .orderBy('timestamp', descending: true)
+//         .snapshots()
+//         .map((snapshot) {
+//       return snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
+//     });
+//   }
+
+//   // KEEP THIS: Get all pets (one-time fetch)
+//   Future<List<PetModel>> getAllPetsOnce() async {
+//     try {
+//       final snapshot = await _firestore
+//           .collection('pets')
+//           .orderBy('timestamp', descending: true)
+//           .get();
+
+//       return snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
+//     } catch (e) {
+//       print('Error getting all pets: $e');
+//       return [];
+//     }
+//   }
+
+//   // KEEP THIS: Search pets
+//   Future<List<PetModel>> searchPets(String query) async {
+//     try {
+//       final snapshot = await _firestore.collection('pets').get();
+//       List<PetModel> allPets =
+//           snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
+
+//       // Filter pets based on query
+//       List<PetModel> filteredPets = allPets.where((pet) {
+//         return pet.name.toLowerCase().contains(query.toLowerCase()) ||
+//             pet.breed.toLowerCase().contains(query.toLowerCase()) ||
+//             pet.color.toLowerCase().contains(query.toLowerCase()) ||
+//             (pet.description?.toLowerCase().contains(query.toLowerCase()) ??
+//                 false);
+//       }).toList();
+
+//       filteredPets.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+//       return filteredPets;
+//     } catch (e) {
+//       print('Error searching pets: $e');
+//       return [];
+//     }
+//   }
+
+//   // KEEP THIS: Get pets near location
+//   Future<List<PetModel>> getPetsNearLocation(
+//       double latitude, double longitude, double radiusKm) async {
+//     try {
+//       final snapshot = await _firestore.collection('pets').get();
+//       List<PetModel> allPets =
+//           snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
+
+//       // Filter pets by distance
+//       List<PetModel> nearbyPets = allPets.where((pet) {
+//         if (pet.latitude == 0.0 || pet.longitude == 0.0) return false;
+
+//         double distance = _calculateDistance(
+//             latitude, longitude, pet.latitude, pet.longitude);
+
+//         return distance <= radiusKm;
+//       }).toList();
+
+//       nearbyPets.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+//       return nearbyPets;
+//     } catch (e) {
+//       print('Error getting nearby pets: $e');
+//       return [];
+//     }
+//   }
+
+//   // KEEP THIS: Calculate distance
+//   double _calculateDistance(
+//       double lat1, double lon1, double lat2, double lon2) {
+//     const double earthRadius = 6371;
+
+//     double dLat = _degreesToRadians(lat2 - lat1);
+//     double dLon = _degreesToRadians(lon2 - lon1);
+
+//     double a = sin(dLat / 2) * sin(dLat / 2) +
+//         cos(_degreesToRadians(lat1)) *
+//             cos(_degreesToRadians(lat2)) *
+//             sin(dLon / 2) *
+//             sin(dLon / 2);
+
+//     double c = 2 * asin(sqrt(a));
+
+//     return earthRadius * c;
+//   }
+
+//   // KEEP THIS: Convert degrees to radians
+//   double _degreesToRadians(double degrees) {
+//     return degrees * (pi / 180);
+//   }
+
+//   // REMOVE THESE OLD METHODS (they're redundant with the new structure):
+//   // - Old addPet(PetModel pet, File imageFile)
+//   // - updatePetWithImage method
+//   // - Old deletePet(String petId, String imageUrl)
+// }
+
+// import 'dart:io';
+// import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:pettrack/models/pet_model.dart';
+// import 'package:pettrack/services/cloudinary_service.dart';
+
+// class PetService {
+//   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+//   final CloudinaryService _cloudinaryService = CloudinaryService();
+
+//   // Upload image
+//   Future<String> uploadImage(File imageFile) async {
+//     try {
+//       return await _cloudinaryService.uploadImage(imageFile);
+//     } catch (e) {
+//       throw Exception('Failed to upload image: $e');
+//     }
+//   }
+
+//   // Add owned pet
+//   Future<String> addPet(Map<String, dynamic> petData) async {
+//     try {
+//       final docRef = await _firestore.collection('owned_pets').add(petData);
+//       return docRef.id;
+//     } catch (e) {
+//       throw Exception('Failed to add pet: $e');
+//     }
+//   }
+
+//   // Update owned pet
+//   Future<void> updatePet(String petId, Map<String, dynamic> petData) async {
+//     try {
+//       await _firestore.collection('owned_pets').doc(petId).update(petData);
+//     } catch (e) {
+//       throw Exception('Failed to update pet: $e');
+//     }
+//   }
+
+//   // Delete owned pet
+//   Future<void> deletePet(String petId) async {
+//     try {
+//       await _firestore.collection('owned_pets').doc(petId).delete();
+//     } catch (e) {
+//       throw Exception('Failed to delete pet: $e');
+//     }
+//   }
+
+//     // ADD THIS: Create lost report from owned pet
+//   Future<String> reportPetAsLost(
+//     PetModel pet, {
+//     required String location,
+//     required double latitude,
+//     required double longitude,
+//     String? additionalDescription,
+//     String? contactInfo,
+//   }) async {
+//     try {
+//       // Create lost pet data
+//       final lostPetData = {
+//         'name': pet.name,
+//         'breed': pet.breed,
+//         'color': pet.color,
+//         'imageUrl': pet.imageUrl,
+//         'status': 'lost',
+//         'location': location,
+//         'latitude': latitude,
+//         'longitude': longitude,
+//         'timestamp': FieldValue.serverTimestamp(),
+//         'userId': pet.ownerId,
+//         'ownedPetId': pet.id, // Link to original owned pet
+//         'description': additionalDescription ?? pet.description,
+//         'contactInfo': contactInfo,
+//         'petType': 'dog', // or determine from pet data
+//       };
+
+//       // Add to lost_found_pets collection
+//       final docRef =
+//           await _firestore.collection('lost_found_pets').add(lostPetData);
+
+//       // Update owned pet to mark as lost
+//       await markPetAsLost(pet.id!);
+
+//       return docRef.id;
+//     } catch (e) {
+//       throw Exception('Failed to report pet as lost: $e');
+//     }
+//   }
+
+//   // ADD THIS: Mark pet as found and remove from lost_found_pets
+//   Future<void> markPetAsFoundAndRemoveReport(
+//       String petId, String? lostReportId) async {
+//     try {
+//       // Mark owned pet as found
+//       await markPetAsFound(petId);
+
+//       // Remove from lost_found_pets if report ID is provided
+//       if (lostReportId != null) {
+//         await _firestore
+//             .collection('lost_found_pets')
+//             .doc(lostReportId)
+//             .delete();
+//       }
+//     } catch (e) {
+//       throw Exception('Failed to mark pet as found: $e');
+//     }
+//   }
+
+//   // ADD THIS: Get lost report for owned pet
+//   Future<String?> getLostReportId(String ownedPetId) async {
+//     try {
+//       final snapshot = await _firestore
+//           .collection('lost_found_pets')
+//           .where('ownedPetId', isEqualTo: ownedPetId)
+//           .where('status', isEqualTo: 'lost')
+//           .limit(1)
+//           .get();
+
+//       if (snapshot.docs.isNotEmpty) {
+//         return snapshot.docs.first.id;
+//       }
+//       return null;
+//     } catch (e) {
+//       print('Error getting lost report ID: $e');
+//       return null;
+//     }
+//   }
+
+
+//   // Get pets by user ID (owned pets only)
+//   Future<List<PetModel>> getPetsByUserId(String userId) async {
+//     try {
+//       final snapshot = await _firestore
+//           .collection('owned_pets')
+//           .where('ownerId', isEqualTo: userId)
+//           .orderBy('timestamp', descending: true)
+//           .get();
+
+//       return snapshot.docs
+//           .map((doc) => PetModel.fromFirestore(doc))
+//           .toList();
+//     } catch (e) {
+//       print('Error getting pets by user ID: $e');
+//       return [];
+//     }
+//   }
+
+//   // Get owned pet by ID
+//   Future<PetModel?> getPetById(String petId) async {
+//     try {
+//       final doc = await _firestore.collection('owned_pets').doc(petId).get();
+//       if (doc.exists) {
+//         return PetModel.fromFirestore(doc);
+//       }
+//       return null;
+//     } catch (e) {
+//       print('Error getting pet by ID: $e');
+//       return null;
+//     }
+//   }
+
+//   // Mark pet as lost
+//   Future<void> markPetAsLost(String petId) async {
+//     try {
+//       await _firestore.collection('owned_pets').doc(petId).update({
+//         'isLost': true,
+//       });
+//     } catch (e) {
+//       throw Exception('Failed to mark pet as lost: $e');
+//     }
+//   }
+
+//   // Mark pet as found
+//   Future<void> markPetAsFound(String petId) async {
+//     try {
+//       await _firestore.collection('owned_pets').doc(petId).update({
+//         'isLost': false,
+//       });
+//     } catch (e) {
+//       throw Exception('Failed to mark pet as found: $e');
+//     }
+//   }
+
+//   // Get all owned pets (for similarity search)
+//   Future<List<PetModel>> getAllPetsOnce() async {
+//     try {
+//       final snapshot = await _firestore
+//           .collection('owned_pets')
+//           .orderBy('timestamp', descending: true)
+//           .get();
+
+//       return snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
+//     } catch (e) {
+//       print('Error getting all pets: $e');
+//       return [];
+//     }
+//   }
+// }
 import 'dart:io';
-import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // Add this import
 import 'package:pettrack/models/pet_model.dart';
 import 'package:pettrack/services/cloudinary_service.dart';
 
@@ -299,8 +783,7 @@ class PetService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final CloudinaryService _cloudinaryService = CloudinaryService();
 
-  // ADD THIS: Upload image method (can use Cloudinary or Firebase Storage)
-  // Upload image method
+  // Upload image
   Future<String> uploadImage(File imageFile) async {
     try {
       return await _cloudinaryService.uploadImage(imageFile);
@@ -309,184 +792,227 @@ class PetService {
     }
   }
 
-
-
-  // UPDATE THIS: Modified addPet method to accept Map instead of PetModel + File
+  // Add owned pet
   Future<String> addPet(Map<String, dynamic> petData) async {
     try {
-      // Add to Firestore
-      final docRef = await _firestore.collection('pets').add(petData);
+      final docRef = await _firestore.collection('owned_pets').add(petData);
       return docRef.id;
     } catch (e) {
-      print('Error in addPet: $e');
       throw Exception('Failed to add pet: $e');
     }
   }
 
-  // UPDATE THIS: Modified updatePet to accept petId and Map
+  // Update owned pet
   Future<void> updatePet(String petId, Map<String, dynamic> petData) async {
     try {
-      // Update in Firestore
-      await _firestore.collection('pets').doc(petId).update(petData);
+      await _firestore.collection('owned_pets').doc(petId).update(petData);
     } catch (e) {
-      print('Error updating pet: $e');
       throw Exception('Failed to update pet: $e');
     }
   }
 
-  // UPDATE THIS: Simplified deletePet method
+  // Delete owned pet
   Future<void> deletePet(String petId) async {
     try {
-      // Get pet data to extract image URL
-      final petDoc = await _firestore.collection('pets').doc(petId).get();
-
-      if (petDoc.exists) {
-        final petData = petDoc.data();
-        final imageUrl = petData?['imageUrl'] as String?;
-
-        // Delete from Firestore
-        await _firestore.collection('pets').doc(petId).delete();
-
-        // Optional: Delete image from storage
-        if (imageUrl != null && imageUrl.isNotEmpty) {
-          try {
-            // If using Cloudinary
-            String publicId =
-                _cloudinaryService.extractPublicIdFromUrl(imageUrl);
-            print('Pet deleted. Image public ID for manual cleanup: $publicId');
-
-            // If using Firebase Storage, uncomment below:
-            /*
-            final ref = FirebaseStorage.instance.refFromURL(imageUrl);
-            await ref.delete();
-            */
-          } catch (e) {
-            print('Error deleting image: $e');
-          }
-        }
-      }
+      await _firestore.collection('owned_pets').doc(petId).delete();
     } catch (e) {
-      print('Error deleting pet: $e');
       throw Exception('Failed to delete pet: $e');
     }
   }
 
-  // UPDATE THIS: Get pets by user ID with 'owned' status filter
-  // Future<List<PetModel>> getPetsByUserId(String userId) async {
-  //   try {
-  //     final snapshot = await _firestore
-  //         .collection('pets')
-  //         .where('ownerId',
-  //             isEqualTo: userId) // Changed from 'userId' to 'ownerId'
-  //         .where('status', isEqualTo: 'owned')
-  //         .orderBy('timestamp', descending: true)
-  //         .get();
+  // UPDATED: Create lost report from owned pet
+  Future<String> reportPetAsLost(
+    PetModel pet, {
+    required String location,
+    required double latitude,
+    required double longitude,
+    String? additionalDescription,
+    String? contactInfo,
+    String? imageUrl, // Added this parameter
+    DateTime? lastSeenDate, // Added this parameter
+  }) async {
+    try {
+      // Use the new image if provided, otherwise use the pet's existing image
+      final finalImageUrl = imageUrl ?? pet.imageUrl;
 
-  //     return snapshot.docs
-  //         .map((doc) => PetModel.fromFirestore(
-  //             doc)) // Use fromFirestore instead of fromMap
-  //         .toList();
-  //   } catch (e) {
-  //     print('Error getting pets by user ID: $e');
-  //     return [];
-  //   }
-  // }
-// Update this method in pet_service.dart
+      // Create lost pet data for lost_found_pets collection
+      final lostPetData = {
+        'name': pet.name,
+        'breed': pet.breed,
+        'color': pet.color,
+        'imageUrl': finalImageUrl,
+        'status': 'lost',
+        'location': location,
+        'latitude': latitude,
+        'longitude': longitude,
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': pet.ownerId,
+        'ownedPetId': pet.id, // Link to original owned pet
+        'description': additionalDescription ?? pet.description,
+        'contactInfo': contactInfo,
+        'petType': _determinePetType(pet.breed),
+        'size': _determinePetSize(pet.weight),
+        'lastSeenDate': lastSeenDate,
+      };
+
+      // Add to lost_found_pets collection
+      final docRef =
+          await _firestore.collection('lost_found_pets').add(lostPetData);
+
+      // Update owned pet to mark as lost
+      await markPetAsLost(pet.id!);
+
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Failed to report pet as lost: $e');
+    }
+  }
+
+  // Helper method to determine pet type from breed
+  String _determinePetType(String breed) {
+    final dogBreeds = [
+      'labrador',
+      'golden retriever',
+      'german shepherd',
+      'bulldog',
+      'poodle',
+      'beagle',
+      'husky',
+      'rottweiler',
+      'boxer',
+      'dachshund'
+    ];
+    final catBreeds = [
+      'persian',
+      'siamese',
+      'maine coon',
+      'british shorthair',
+      'ragdoll',
+      'bengal',
+      'abyssinian'
+    ];
+
+    final lowerBreed = breed.toLowerCase();
+
+    if (dogBreeds.any((dogBreed) => lowerBreed.contains(dogBreed))) {
+      return 'Dog';
+    } else if (catBreeds.any((catBreed) => lowerBreed.contains(catBreed))) {
+      return 'Cat';
+    }
+
+    return 'Dog'; // Default to Dog if uncertain
+  }
+
+  // Helper method to determine pet size from weight
+  String _determinePetSize(String weight) {
+    if (weight.isEmpty) return 'Medium';
+
+    final weightNum =
+        double.tryParse(weight.replaceAll(RegExp(r'[^0-9.]'), ''));
+
+    if (weightNum == null) return 'Medium';
+
+    if (weightNum < 10) return 'Small';
+    if (weightNum < 25) return 'Medium';
+    return 'Large';
+  }
+
+  // Mark pet as found and remove from lost_found_pets
+  Future<void> markPetAsFoundAndRemoveReport(
+      String petId, String? lostReportId) async {
+    try {
+      // Mark owned pet as found
+      await markPetAsFound(petId);
+
+      // Remove from lost_found_pets if report ID is provided
+      if (lostReportId != null) {
+        await _firestore
+            .collection('lost_found_pets')
+            .doc(lostReportId)
+            .delete();
+      }
+    } catch (e) {
+      throw Exception('Failed to mark pet as found: $e');
+    }
+  }
+
+  // Get lost report for owned pet
+  Future<String?> getLostReportId(String ownedPetId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('lost_found_pets')
+          .where('ownedPetId', isEqualTo: ownedPetId)
+          .where('status', isEqualTo: 'lost')
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.first.id;
+      }
+      return null;
+    } catch (e) {
+      print('Error getting lost report ID: $e');
+      return null;
+    }
+  }
+
+  // Get pets by user ID (owned pets only)
   Future<List<PetModel>> getPetsByUserId(String userId) async {
     try {
-      print('Getting pets for user: $userId'); // Debug log
-
-      // Try both field names for compatibility
-      final snapshot1 = await _firestore
-          .collection('pets')
+      final snapshot = await _firestore
+          .collection('owned_pets')
           .where('ownerId', isEqualTo: userId)
+          .orderBy('timestamp', descending: true)
           .get();
 
-      final snapshot2 = await _firestore
-          .collection('pets')
-          .where('userId', isEqualTo: userId)
-          .get();
-
-      // Combine results and remove duplicates
-      Set<String> seenIds = {};
-      List<PetModel> allPets = [];
-
-      for (var doc in [...snapshot1.docs, ...snapshot2.docs]) {
-        if (!seenIds.contains(doc.id)) {
-          seenIds.add(doc.id);
-          allPets.add(PetModel.fromFirestore(doc));
-        }
-      }
-
-      print('Found ${allPets.length} pets'); // Debug log
-
-      // Sort by timestamp
-      allPets.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      return allPets;
+      return snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
     } catch (e) {
       print('Error getting pets by user ID: $e');
       return [];
     }
   }
-  // KEEP THIS: Get pets by status (lost/found)
-  Stream<List<PetModel>> getPetsByStatus(String status) {
-    return _firestore
-        .collection('pets')
-        .where('status', isEqualTo: status)
-        .snapshots()
-        .map((snapshot) {
-      List<PetModel> pets =
-          snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
 
-      pets.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      return pets;
-    });
-  }
-
-  // UPDATE THIS: Get a single pet by ID (already good, just ensure it uses fromFirestore)
+  // Get owned pet by ID
   Future<PetModel?> getPetById(String petId) async {
     try {
-      DocumentSnapshot doc =
-          await _firestore.collection('pets').doc(petId).get();
+      final doc = await _firestore.collection('owned_pets').doc(petId).get();
       if (doc.exists) {
         return PetModel.fromFirestore(doc);
       }
       return null;
     } catch (e) {
       print('Error getting pet by ID: $e');
-      return null; // Return null instead of rethrowing for better UX
+      return null;
     }
   }
 
-  // UPDATE THIS: Get pets by user ID as Stream
-  Stream<List<PetModel>> getUserPets(String userId) {
-    return _firestore
-        .collection('pets')
-        .where('ownerId', isEqualTo: userId) // Changed from 'userId'
-        .where('status', isEqualTo: 'owned')
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
-    });
+  // Mark pet as lost
+  Future<void> markPetAsLost(String petId) async {
+    try {
+      await _firestore.collection('owned_pets').doc(petId).update({
+        'isLost': true,
+      });
+    } catch (e) {
+      throw Exception('Failed to mark pet as lost: $e');
+    }
   }
 
-  // KEEP THIS: Get all pets (stream)
-  Stream<List<PetModel>> getAllPets() {
-    return _firestore
-        .collection('pets')
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
-    });
+  // Mark pet as found
+  Future<void> markPetAsFound(String petId) async {
+    try {
+      await _firestore.collection('owned_pets').doc(petId).update({
+        'isLost': false,
+      });
+    } catch (e) {
+      throw Exception('Failed to mark pet as found: $e');
+    }
   }
 
-  // KEEP THIS: Get all pets (one-time fetch)
+  // Get all owned pets (for similarity search)
   Future<List<PetModel>> getAllPetsOnce() async {
     try {
       final snapshot = await _firestore
-          .collection('pets')
+          .collection('owned_pets')
           .orderBy('timestamp', descending: true)
           .get();
 
@@ -496,83 +1022,4 @@ class PetService {
       return [];
     }
   }
-
-  // KEEP THIS: Search pets
-  Future<List<PetModel>> searchPets(String query) async {
-    try {
-      final snapshot = await _firestore.collection('pets').get();
-      List<PetModel> allPets =
-          snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
-
-      // Filter pets based on query
-      List<PetModel> filteredPets = allPets.where((pet) {
-        return pet.name.toLowerCase().contains(query.toLowerCase()) ||
-            pet.breed.toLowerCase().contains(query.toLowerCase()) ||
-            pet.color.toLowerCase().contains(query.toLowerCase()) ||
-            (pet.description?.toLowerCase().contains(query.toLowerCase()) ??
-                false);
-      }).toList();
-
-      filteredPets.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      return filteredPets;
-    } catch (e) {
-      print('Error searching pets: $e');
-      return [];
-    }
-  }
-
-  // KEEP THIS: Get pets near location
-  Future<List<PetModel>> getPetsNearLocation(
-      double latitude, double longitude, double radiusKm) async {
-    try {
-      final snapshot = await _firestore.collection('pets').get();
-      List<PetModel> allPets =
-          snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
-
-      // Filter pets by distance
-      List<PetModel> nearbyPets = allPets.where((pet) {
-        if (pet.latitude == 0.0 || pet.longitude == 0.0) return false;
-
-        double distance = _calculateDistance(
-            latitude, longitude, pet.latitude, pet.longitude);
-
-        return distance <= radiusKm;
-      }).toList();
-
-      nearbyPets.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      return nearbyPets;
-    } catch (e) {
-      print('Error getting nearby pets: $e');
-      return [];
-    }
-  }
-
-  // KEEP THIS: Calculate distance
-  double _calculateDistance(
-      double lat1, double lon1, double lat2, double lon2) {
-    const double earthRadius = 6371;
-
-    double dLat = _degreesToRadians(lat2 - lat1);
-    double dLon = _degreesToRadians(lon2 - lon1);
-
-    double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_degreesToRadians(lat1)) *
-            cos(_degreesToRadians(lat2)) *
-            sin(dLon / 2) *
-            sin(dLon / 2);
-
-    double c = 2 * asin(sqrt(a));
-
-    return earthRadius * c;
-  }
-
-  // KEEP THIS: Convert degrees to radians
-  double _degreesToRadians(double degrees) {
-    return degrees * (pi / 180);
-  }
-
-  // REMOVE THESE OLD METHODS (they're redundant with the new structure):
-  // - Old addPet(PetModel pet, File imageFile)
-  // - updatePetWithImage method
-  // - Old deletePet(String petId, String imageUrl)
 }
