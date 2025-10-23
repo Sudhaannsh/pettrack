@@ -45,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const Icon(
               Icons.pets,
               size: 100,
-              color: Colors.blue,
+              color: Color.fromARGB(255, 6, 228, 195),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -53,7 +53,7 @@ class _SplashScreenState extends State<SplashScreen> {
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.blue,
+                color: Color.fromARGB(255, 6, 201, 201),
               ),
             ),
             const SizedBox(height: 10),

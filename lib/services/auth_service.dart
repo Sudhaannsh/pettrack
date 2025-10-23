@@ -42,14 +42,38 @@ class AuthService {
  
   // Create user in Firestore
   Future<void> _createUserInFirestore(User user, String name) async {
-    UserModel newUser = UserModel(
-      uid: user.uid,
-      email: user.email!,
-      name: name,
-      createdAt: DateTime.now(),
-    );
+    try {
+      UserModel newUser = UserModel(
+        uid: user.uid,
+        email: user.email!,
+        name: name,
+        createdAt: DateTime.now(),
+      );
 
-    await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
+      await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
+      print('User created in Firestore successfully: ${user.uid}');
+    } catch (e) {
+      print('Error creating user in Firestore: $e');
+      rethrow;
+    }
+  }
+
+  // Get user data from Firestore
+  Future<UserModel?> getUserData() async {
+    try {
+      if (currentUser == null) return null;
+      
+      final doc = await _firestore.collection('users').doc(currentUser!.uid).get();
+      if (!doc.exists) {
+        print('No user document found for ID: ${currentUser!.uid}');
+        return null;
+      }
+      
+      return UserModel.fromMap(doc.data() as Map<String, dynamic>);
+    } catch (e) {
+      print('Error getting user data: $e');
+      return null;
+    }
   }
 
   // Sign out
