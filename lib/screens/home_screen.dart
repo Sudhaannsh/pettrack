@@ -767,16 +767,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             tooltip: 'Search by Image',
           ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              // Toggle search visibility or focus
-              if (_searchController.text.isNotEmpty) {
-                _searchController.clear();
-                _performSearch('');
-              }
-            },
-          ),
+          
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {

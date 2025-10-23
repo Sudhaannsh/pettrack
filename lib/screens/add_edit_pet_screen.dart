@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:pettrack/models/pet_model.dart';
 import 'package:pettrack/services/pet_service.dart';
 import 'package:pettrack/services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // ADD this import
 import 'dart:io';
 
 class AddEditPetScreen extends StatefulWidget {
@@ -96,11 +97,16 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
         throw Exception('User not authenticated');
       }
 
+      print('=== DEBUG: Saving pet ===');
+      print('User ID: $userId');
+
       String imageUrl = _existingImageUrl ?? '';
 
       // Upload new image if selected
       if (_imageFile != null) {
+        print('Uploading image...');
         imageUrl = await _petService.uploadImage(_imageFile!);
+        print('Image uploaded: $imageUrl');
       }
 
       final petData = {
@@ -113,13 +119,16 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
         'medicalNotes': _medicalNotesController.text.trim(),
         'imageUrl': imageUrl,
         'ownerId': userId,
-        'status': 'owned', // Status for owned pets
-        'timestamp': DateTime.now(),
+        'timestamp': FieldValue.serverTimestamp(),
+        'isLost': false,
       };
+
+      print('Pet data to save: $petData');
 
       if (widget.pet == null) {
         // Add new pet
-        await _petService.addPet(petData);
+        final petId = await _petService.addPet(petData);
+        print('Pet added with ID: $petId');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Pet added successfully')),
@@ -128,6 +137,7 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
       } else {
         // Update existing pet
         await _petService.updatePet(widget.pet!.id!, petData);
+        print('Pet updated: ${widget.pet!.id}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Pet updated successfully')),
@@ -139,6 +149,7 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
         Navigator.of(context).pop(true);
       }
     } catch (e) {
+      print('ERROR saving pet: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error saving pet: $e')),
@@ -152,6 +163,164 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
       }
     }
   }
+
+  // Future<void> _savePet() async {
+  //   if (!_formKey.currentState!.validate()) {
+  //     return;
+  //   }
+
+  //   if (_imageFile == null && _existingImageUrl == null) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Please select a pet image')),
+  //     );
+  //     return;
+  //   }
+
+  //   setState(() {
+  //     _isLoading = true;
+  //   });
+
+  //   try {
+  //     final userId = _authService.currentUser?.uid;
+  //     if (userId == null) {
+  //       throw Exception('User not authenticated');
+  //     }
+
+  //     String imageUrl = _existingImageUrl ?? '';
+
+  //     // Upload new image if selected
+  //     if (_imageFile != null) {
+  //       imageUrl = await _petService.uploadImage(_imageFile!);
+  //     }
+
+  //     final petData = {
+  //       'name': _nameController.text.trim(),
+  //       'breed': _breedController.text.trim(),
+  //       'color': _colorController.text.trim(),
+  //       'age': _ageController.text.trim(),
+  //       'weight': _weightController.text.trim(),
+  //       'description': _descriptionController.text.trim(),
+  //       'medicalNotes': _medicalNotesController.text.trim(),
+  //       'imageUrl': imageUrl,
+  //       'ownerId': userId,
+  //       'timestamp': FieldValue.serverTimestamp(), // FIXED: Use FieldValue.serverTimestamp()
+  //       'isLost': false, // ADD: Add isLost field
+  //     };
+
+  //     if (widget.pet == null) {
+  //       // Add new pet
+  //       await _petService.addPet(petData);
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(content: Text('Pet added successfully')),
+  //         );
+  //       }
+  //     } else {
+  //       // Update existing pet
+  //       await _petService.updatePet(widget.pet!.id!, petData);
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(content: Text('Pet updated successfully')),
+  //         );
+  //       }
+  //     }
+
+  //     if (mounted) {
+  //       Navigator.of(context).pop(true);
+  //     }
+  //   } catch (e) {
+  //     print('Error saving pet: $e'); // ADD: Debug log
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Error saving pet: $e')),
+  //       );
+  //     }
+  //   } finally {
+  //     if (mounted) {
+  //       setState(() {
+  //         _isLoading = false;
+  //       });
+  //     }
+  //   }
+  // }
+  // Future<void> _savePet() async {
+  //   if (!_formKey.currentState!.validate()) {
+  //     return;
+  //   }
+
+  //   if (_imageFile == null && _existingImageUrl == null) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Please select a pet image')),
+  //     );
+  //     return;
+  //   }
+
+  //   setState(() {
+  //     _isLoading = true;
+  //   });
+
+  //   try {
+  //     final userId = _authService.currentUser?.uid;
+  //     if (userId == null) {
+  //       throw Exception('User not authenticated');
+  //     }
+
+  //     String imageUrl = _existingImageUrl ?? '';
+
+  //     // Upload new image if selected
+  //     if (_imageFile != null) {
+  //       imageUrl = await _petService.uploadImage(_imageFile!);
+  //     }
+
+  //     final petData = {
+  //       'name': _nameController.text.trim(),
+  //       'breed': _breedController.text.trim(),
+  //       'color': _colorController.text.trim(),
+  //       'age': _ageController.text.trim(),
+  //       'weight': _weightController.text.trim(),
+  //       'description': _descriptionController.text.trim(),
+  //       'medicalNotes': _medicalNotesController.text.trim(),
+  //       'imageUrl': imageUrl,
+  //       'ownerId': userId,
+  //       'status': 'owned', // Status for owned pets
+  //       'timestamp': DateTime.now(),
+  //     };
+
+  //     if (widget.pet == null) {
+  //       // Add new pet
+  //       await _petService.addPet(petData);
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(content: Text('Pet added successfully')),
+  //         );
+  //       }
+  //     } else {
+  //       // Update existing pet
+  //       await _petService.updatePet(widget.pet!.id!, petData);
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(content: Text('Pet updated successfully')),
+  //         );
+  //       }
+  //     }
+
+  //     if (mounted) {
+  //       Navigator.of(context).pop(true);
+  //     }
+  //   } catch (e) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Error saving pet: $e')),
+  //       );
+  //     }
+  //   } finally {
+  //     if (mounted) {
+  //       setState(() {
+  //         _isLoading = false;
+  //       });
+  //     }
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {

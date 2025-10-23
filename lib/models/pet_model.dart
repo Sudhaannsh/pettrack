@@ -238,6 +238,8 @@
 //   // ADD: Helper method to check if this is a found pet
 //   bool get isFoundPet => status == 'found';
 // }
+
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PetModel {

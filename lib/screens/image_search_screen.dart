@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:pettrack/services/mobilenet_similarity_service.dart';
 import 'package:pettrack/screens/pet_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -426,7 +427,9 @@ Widget _buildSearchResults() {
   }
 
   Widget _buildResultCard(SimilarPetResult result, int rank) {
-    final similarity = (result.similarityScore * 100).round();
+    // final clampedScore = result.similarityScore.clamp(0.0, 1.0);
+    // final similarity = (clampedScore * 100).round();
+    final similarity = (result.similarityScore*50).round();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
