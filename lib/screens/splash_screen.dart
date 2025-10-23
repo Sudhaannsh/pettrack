@@ -42,10 +42,9 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.pets,
-              size: 100,
-              color: Color.fromARGB(255, 6, 228, 195),
+            Image.asset(
+              'assets/images/icon2.png', // <-- Make sure this path matches your file
+              height: 80, // Use height (or width) instead of size
             ),
             const SizedBox(height: 20),
             const Text(

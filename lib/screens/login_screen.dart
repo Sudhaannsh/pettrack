@@ -246,10 +246,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   const SizedBox(
                       height: 80), // ✅ add top spacing for scroll effect
-                  const Icon(
-                    Icons.pets,
-                    size: 80,
-                    color: Colors.blue,
+                  Image.asset(
+                    'assets/images/icon2.png', // <-- Make sure this path matches your file
+                    height: 200, // Use height (or width) instead of size
                   ),
                   const SizedBox(height: 20),
                   const Text(
